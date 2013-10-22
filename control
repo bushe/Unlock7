@@ -1,0 +1,9 @@
+Package: com.bushe.unlock7
+Name: Unlock7
+Depends: mobilesubstrate
+Version: 0.0.1
+Architecture: iphoneos-arm
+Description: An awesome MobileSubstrate tweak!
+Maintainer: Bushe
+Author: Bushe
+Section: Tweaks
