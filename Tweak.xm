@@ -35,8 +35,7 @@ CGPoint _priorPoint;
 	UIView *&_backgroundView(MSHookIvar<UIView *>(self, "_backgroundView"));
 	[_backgroundView setUserInteractionEnabled:YES]; //Allows backbround to use gesture
 
-	SBAwayDateView *&_dateHeaderView(MSHookIvar<SBAwayDateView *>(self, "_dateHeaderView"));
-	[_dateHeaderView setPositon]; //reset the position of the date view to be below the larger clock
+	[[self dateHeaderView] setPositon]; //reset the position of the date view to be below the larger clock
 
 	UIPanGestureRecognizer *panRecognizer = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(newUnlockStyleMover:)];
     [panRecognizer setMinimumNumberOfTouches:1];
@@ -56,18 +55,33 @@ CGPoint _priorPoint;
     [panRecognizer setMaximumNumberOfTouches:1];
     [[self topBar] addGestureRecognizer:panRecognizer]; //Clock and Date View's
 	[panRecognizer release];
+
+	[self _setTopBarImage:[self getUIImageForControls] shadowColor:[UIColor clearColor]];
+
+	[[UIDevice currentDevice] beginGeneratingDeviceOrientationNotifications];
+	[[NSNotificationCenter defaultCenter]
+	   addObserver:self selector:@selector(orientationChanged:)
+	   name:UIDeviceOrientationDidChangeNotification
+	   object:[UIDevice currentDevice]];
+}
+
+%new
+- (void) orientationChanged:(NSNotification *)note
+{
+   [[self dateHeaderView] setPositon];
 }
 
 %new
 - (void)newUnlockStyleMover:(UIPanGestureRecognizer *)sender {
 		UIView *&_lockBar(MSHookIvar<UIView *>(self, "_lockBar"));
+		float width = ([UIApplication sharedApplication].statusBarOrientation == UIInterfaceOrientationPortrait || [UIApplication sharedApplication].statusBarOrientation == UIInterfaceOrientationPortraitUpsideDown) ? [[UIScreen mainScreen] bounds].size.width : [[UIScreen mainScreen] bounds].size.height;
 		CGPoint point = [sender locationInView:sender.view.superview];
-		if (sender.state == UIGestureRecognizerStateChanged && _lockBar.frame.size.height == 96) {
+		if (sender.state == UIGestureRecognizerStateChanged){
 			UIImage *_defaultDesktopImage = [self _defaultDesktopImage];
 			for(UIView *obj in [self subviews]){	
 				if(obj != [self.subviews objectAtIndex:0]){
 					CGPoint center = obj.center;
-					if(center.x < 160)
+					if(center.x < width/2)
 						center.x += (point.x - _priorPoint.x)/3;
 					else
 						center.x += point.x - _priorPoint.x;
@@ -76,13 +90,13 @@ CGPoint _priorPoint;
 				}
 			}
 		}
-		else if (sender.state == UIGestureRecognizerStateEnded && _lockBar.frame.size.height == 96){
-			if(_lockBar.center.x < 300){
+		else if (sender.state == UIGestureRecognizerStateEnded){
+			if(_lockBar.center.x < width){
 
 				for(UIView *obj in [self subviews]){	
 					if(obj != [self.subviews objectAtIndex:0]){
 						CGPoint center = obj.center;
-						center.x = 160;
+						center.x = width/2;
 						[UIView animateWithDuration:0.6
 							 animations:^{ 
 								obj.center = center;
@@ -96,7 +110,7 @@ CGPoint _priorPoint;
 				for(UIView *obj in [self subviews]){	
 					if(obj != [self.subviews objectAtIndex:0]){
 						CGPoint center = obj.center;
-						center.x = 480;
+						center.x = width+(width/2);
 						[UIView animateWithDuration:0.2
 							 animations:^{ 
 								obj.center = center;
@@ -108,7 +122,7 @@ CGPoint _priorPoint;
 				if([[NSFileManager defaultManager] fileExistsAtPath:[NSString stringWithFormat:@"/Library/MobileSubstrate/DynamicLibraries/AndroidLock.dylib"]] == TRUE && [[[NSDictionary dictionaryWithContentsOfFile:@"/var/mobile/Library/Preferences/com.zmaster.AndroidLock.plist"] objectForKey:@"Enable"] boolValue] == TRUE){
 					[[%c(SBAwayController) sharedAwayController] unlockWithSound:TRUE bypassPinLock:[[%c(SBDeviceLockController) sharedController] isPasswordProtected]];
 					CGPoint center = _lockBar.center;
-					center.x = 160;
+					center.x = width/2;
 					_lockBar.center = center;
 				}
 				else{
@@ -133,7 +147,7 @@ CGPoint _priorPoint;
 
 %new
 -(UIImage*)getUIImageForControls{
-	UIGraphicsBeginImageContextWithOptions(CGSizeMake(320, 133), NO, 0.0);
+	UIGraphicsBeginImageContextWithOptions(CGSizeMake([[UIScreen mainScreen] bounds].size.width, 133), NO, 0.0);
 	UIImage *blank = UIGraphicsGetImageFromCurrentImageContext();
 	UIGraphicsEndImageContext();
     return blank;
@@ -153,13 +167,15 @@ CGPoint _priorPoint;
 				[panRecognizer release];
 			for(UIView *obj in [[(NowPlayingArtPluginController *)pluginController view] subviews]){		
 					if([obj isKindOfClass:[UIImageView class]]){
-						obj.frame = CGRectMake(0, 0, 280, 280);
+						if([[UIScreen mainScreen] bounds].size.width == 320)
+							obj.frame = CGRectMake(0, 0, 280, 280);
 					}
 					if([obj isKindOfClass:NSClassFromString(@"NowPlayingReflectionView")]){
 						[obj removeFromSuperview];
 					}
 			}
-			pluginView.frame = CGRectMake(20,173,280,280);
+			if([[UIScreen mainScreen] bounds].size.width == 320)
+				pluginView.frame = CGRectMake(20,173,280,280);
 		}
     }
 }
@@ -169,11 +185,12 @@ CGPoint _priorPoint;
 %hook SBAwayController
 - (void)undimScreen:(BOOL)arg1{
 	//Slide Lockscreen back to default position after the screen sleeps
+	float width = ([UIApplication sharedApplication].statusBarOrientation == UIInterfaceOrientationPortrait || [UIApplication sharedApplication].statusBarOrientation == UIInterfaceOrientationPortraitUpsideDown) ? [[UIScreen mainScreen] bounds].size.width : [[UIScreen mainScreen] bounds].size.height;
 	[[[[%c(SBAwayController) sharedAwayController] awayView] bottomBar] setHidden:NO];
 	for(UIView *obj in [[self awayView] subviews]){	
 		if(obj != [[[self awayView] subviews] objectAtIndex:0]){
 			CGPoint center = obj.center;
-			center.x = 160;		
+			center.x = width/2;		
 			[UIView animateWithDuration:0.6
 				 animations:^{ 
 					obj.center = center;
@@ -212,11 +229,10 @@ CGPoint _priorPoint;
     UILabel *_nowPlayingTitleLabel = MSHookIvar<UILabel *>(self, "_nowPlayingTitleLabel");
 	UILabel *_nowPlayingArtistLabel = MSHookIvar<UILabel *>(self, "_nowPlayingArtistLabel");
 	UILabel *_nowPlayingAlbumLabel = MSHookIvar<UILabel *>(self, "_nowPlayingAlbumLabel");
-	[_nowPlayingTitleLabel setFrame:CGRectMake(0,95,320,20)];
-	[_nowPlayingArtistLabel setFrame:CGRectMake(0,109,320,20)];
-	[_nowPlayingAlbumLabel setFrame:CGRectMake(0,122,320,20)];
+	[_nowPlayingTitleLabel setFrame:CGRectMake(0,95,[[UIScreen mainScreen] bounds].size.width,20)];
+	[_nowPlayingArtistLabel setFrame:CGRectMake(0,109,[[UIScreen mainScreen] bounds].size.width,20)];
+	[_nowPlayingAlbumLabel setFrame:CGRectMake(0,122,[[UIScreen mainScreen] bounds].size.width,20)];
 }
-
 %end
 
 %hook TPLCDTextView
@@ -227,13 +243,38 @@ CGPoint _priorPoint;
 }
 %end
 
+%hook SBAwayLockBar
+-(id)wellImageName{
+	return nil;
+}
+
+- (BOOL)usesBackgroundImage {
+	return NO;
+ }
+
+- (id)initWithFrame:(struct CGRect)frame knobColor:(int)color{
+	UIView *lockBar = %orig;	
+	UIImageView *&_shadowView(MSHookIvar<UIImageView *>(self, "_shadowView"));
+	[_shadowView removeFromSuperview];
+	return lockBar;
+}
+
+- (id)initWithFrame:(struct CGRect)frame knobImage:(id)image{
+	UIView *lockBar = %orig(frame,nil);	
+	UIImageView *&_shadowView(MSHookIvar<UIImageView *>(self, "_shadowView"));
+	[_shadowView removeFromSuperview];
+	return lockBar;
+}
+ %end
+
 %hook SBDeviceLockView
 - (void)notifyDelegateThatCancelButtonWasPressed{
 	//Slide lockscreen back to default position after cancel button is pressed in lockscreen
+	float width = ([UIApplication sharedApplication].statusBarOrientation == UIInterfaceOrientationPortrait || [UIApplication sharedApplication].statusBarOrientation == UIInterfaceOrientationPortraitUpsideDown) ? [[UIScreen mainScreen] bounds].size.width : [[UIScreen mainScreen] bounds].size.height;
 	for(UIView *obj in [[[%c(SBAwayController) sharedAwayController] awayView] subviews]){	
 		if(obj != [[[[%c(SBAwayController) sharedAwayController] awayView] subviews] objectAtIndex:0]){
 			CGPoint center = obj.center;
-			center.x = 160;			
+			center.x = width/2;			
 			[UIView animateWithDuration:0.6
 				 animations:^{ 
 					obj.center = center;
