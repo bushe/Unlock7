@@ -260,7 +260,10 @@ CGPoint _priorPoint;
 }
 
 - (id)initWithFrame:(struct CGRect)frame knobImage:(id)image{
-	UIView *lockBar = %orig(frame,nil);	
+	UIGraphicsBeginImageContextWithOptions(CGSizeMake(60, 47), NO, 0.0);
+	UIImage *blank = UIGraphicsGetImageFromCurrentImageContext();
+	UIGraphicsEndImageContext();
+	UIView *lockBar = %orig(frame,blank);	
 	UIImageView *&_shadowView(MSHookIvar<UIImageView *>(self, "_shadowView"));
 	[_shadowView removeFromSuperview];
 	return lockBar;
